@@ -7,7 +7,7 @@ from .frames import EventMessage
 from .frames import CallbackMessage
 from .frames import SystemMessage
 from .frames import AckMessage
-from .chatbot import ChatbotMessage, RichTextContent, ImageContent, reply_specified_single_chat, \
+from .chatbot import ChatbotMessage, RichTextContent, ImageContent, FileContent, reply_specified_single_chat, \
     reply_specified_group_chat
 from .chatbot import TextContent
 from .chatbot import AtUser
