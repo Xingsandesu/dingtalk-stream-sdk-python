@@ -38,34 +38,55 @@ class FileBotHandler(dingtalk_stream.ChatbotHandler):
 
     async def process(self, callback: dingtalk_stream.CallbackMessage):
         incoming_message = dingtalk_stream.ChatbotMessage.from_dict(callback.data)
-        if incoming_message.message_type != 'file':
+        if incoming_message.message_type not in ('file', 'audio', 'video'):
             return AckMessage.STATUS_OK, 'OK'
 
-        download_codes = incoming_message.get_file_list()
-        if not download_codes:
-            return AckMessage.STATUS_OK, 'OK'
+        download_codes = None
+        if incoming_message.message_type == 'file':
+            download_codes = incoming_message.get_file_list()
+        elif incoming_message.message_type == 'audio':
+            download_codes = incoming_message.get_audio_list()
+        else:
+            download_codes = incoming_message.get_video_list()
 
-        file_name = None
-        if incoming_message.file_content is not None:
-            file_name = incoming_message.file_content.file_name
-
-        download_urls = []
-        for download_code in download_codes:
-            download_url = self.get_file_download_url(download_code)
-            if download_url:
-                self.logger.info('file download url: %s', download_url)
-                download_urls.append(download_url)
-
-        if download_urls:
-            if len(download_urls) == 1:
-                if file_name:
-                    response = 'File: %s\nDownload URL: %s' % (file_name, download_urls[0])
-                else:
-                    response = 'Download URL: %s' % download_urls[0]
+        lines = []
+        if incoming_message.message_type == 'file':
+            if incoming_message.file_content is not None and incoming_message.file_content.file_name:
+                lines.append('File: %s' % incoming_message.file_content.file_name)
             else:
-                lines = ['Download URLs:']
-                lines.extend(['%d. %s' % (idx + 1, url) for idx, url in enumerate(download_urls)])
-                response = '\n'.join(lines)
+                lines.append('File received')
+        elif incoming_message.message_type == 'audio':
+            lines.append('Audio received')
+            if incoming_message.audio_content is not None:
+                if incoming_message.audio_content.duration is not None:
+                    lines.append('Duration: %s' % incoming_message.audio_content.duration)
+                if incoming_message.audio_content.recognition:
+                    lines.append('Recognition: %s' % incoming_message.audio_content.recognition)
+        else:
+            lines.append('Video received')
+            if incoming_message.video_content is not None:
+                if incoming_message.video_content.duration is not None:
+                    lines.append('Duration: %s' % incoming_message.video_content.duration)
+                if incoming_message.video_content.video_type:
+                    lines.append('Video Type: %s' % incoming_message.video_content.video_type)
+
+        if download_codes:
+            download_urls = []
+            for download_code in download_codes:
+                download_url = self.get_file_download_url(download_code)
+                if download_url:
+                    self.logger.info('%s download url: %s', incoming_message.message_type, download_url)
+                    download_urls.append(download_url)
+
+            if download_urls:
+                if len(download_urls) == 1:
+                    lines.append('Download URL: %s' % download_urls[0])
+                else:
+                    lines.append('Download URLs:')
+                    lines.extend(['%d. %s' % (idx + 1, url) for idx, url in enumerate(download_urls)])
+
+        if lines:
+            response = '\n'.join(lines)
             self.reply_text(response, incoming_message)
 
         return AckMessage.STATUS_OK, 'OK'
